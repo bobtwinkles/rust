@@ -71,47 +71,38 @@ impl<'a, 'gcx, 'tcx> NiceRegionError<'a, 'gcx, 'tcx> {
         };
 
         let hir = &self.tcx.hir;
-        if let Some(node_id) = hir.as_local_node_id(id) {
-            if let Some(body_id) = hir.maybe_body_owned_by(node_id) {
-                let body = hir.body(body_id);
-                if let Some(tables) = self.tables {
-                    body.arguments
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(index, arg)| {
-                            // May return None; sometimes the tables are not yet populated.
-                            let ty = tables.node_id_to_type_opt(arg.hir_id)?;
-                            let mut found_anon_region = false;
-                            let new_arg_ty = self.tcx.fold_regions(&ty, &mut false, |r, _| {
-                                if *r == *anon_region {
-                                    found_anon_region = true;
-                                    replace_region
-                                } else {
-                                    r
-                                }
-                            });
-                            if found_anon_region {
-                                let is_first = index == 0;
-                                Some(AnonymousArgInfo {
-                                    arg: arg,
-                                    arg_ty: new_arg_ty,
-                                    bound_region: bound_region,
-                                    is_first: is_first,
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .next()
+        let node_id = hir.as_local_node_id(id)?;
+        let body_id = hir.maybe_body_owned_by(node_id)?;
+        let body = hir.body(body_id);
+        let tables = self.tables?;
+        body.arguments
+            .iter()
+            .enumerate()
+            .filter_map(|(index, arg)| {
+                // May return None; sometimes the tables are not yet populated.
+                let ty = tables.node_id_to_type_opt(arg.hir_id)?;
+                let mut found_anon_region = false;
+                let new_arg_ty = self.tcx.fold_regions(&ty, &mut false, |r, _| {
+                    if *r == *anon_region {
+                        found_anon_region = true;
+                        replace_region
+                    } else {
+                        r
+                    }
+                });
+                if found_anon_region {
+                    let is_first = index == 0;
+                    Some(AnonymousArgInfo {
+                        arg: arg,
+                        arg_ty: new_arg_ty,
+                        bound_region: bound_region,
+                        is_first: is_first,
+                    })
                 } else {
                     None
                 }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+            })
+            .next()
     }
 
     // This method returns the DefId and the BoundRegion corresponding to the given region.
