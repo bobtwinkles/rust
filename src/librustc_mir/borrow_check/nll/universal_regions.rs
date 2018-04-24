@@ -445,10 +445,15 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
         // add will be external.
         let first_extern_index = self.infcx.num_region_vars();
 
-        let defining_ty = self.defining_ty();
+        // Create our index tracker with the static region, because we're always going to need it
+        let mut indices = UniversalRegionIndices {
+            indices: iter::once((self.infcx.tcx.global_tcx().types.re_static, fr_static)).collect(),
+        };
+
+        let defining_ty = self.defining_ty(&mut indices);
         debug!("build: defining_ty={:?}", defining_ty);
 
-        let mut indices = self.compute_indices(fr_static, defining_ty);
+        self.compute_indices(defining_ty, &mut indices);
         debug!("build: indices={:?}", indices);
 
         let bound_inputs_and_output = self.compute_inputs_and_output(&indices, defining_ty);
@@ -534,7 +539,10 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
 
     /// Returns the "defining type" of the current MIR;
     /// see `DefiningTy` for details.
-    fn defining_ty(&self) -> DefiningTy<'tcx> {
+    fn defining_ty(
+        &self,
+        indices: &mut UniversalRegionIndices<'tcx>,
+    ) -> DefiningTy<'tcx> {
         let tcx = self.infcx.tcx;
         let closure_base_def_id = tcx.closure_base_def_id(self.mir_def_id);
 
@@ -548,7 +556,7 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
                 };
 
                 let defining_ty = self.infcx
-                    .replace_free_regions_with_nll_infer_vars(FR, &defining_ty);
+                    .replace_free_regions_with_nll_infer_vars(FR, &defining_ty, indices);
 
                 match defining_ty.sty  {
                     ty::TyClosure(def_id, substs) => DefiningTy::Closure(def_id, substs),
@@ -569,7 +577,7 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
                 assert_eq!(closure_base_def_id, self.mir_def_id);
                 let identity_substs = Substs::identity_for_item(tcx, closure_base_def_id);
                 let substs = self.infcx
-                    .replace_free_regions_with_nll_infer_vars(FR, &identity_substs);
+                    .replace_free_regions_with_nll_infer_vars(FR, &identity_substs, indices);
                 DefiningTy::Const(self.mir_def_id, substs)
             }
         }
@@ -581,14 +589,13 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
     /// the early-bound regions.
     fn compute_indices(
         &self,
-        fr_static: RegionVid,
         defining_ty: DefiningTy<'tcx>,
-    ) -> UniversalRegionIndices<'tcx> {
+        indices: &mut UniversalRegionIndices<'tcx>,
+    ) {
         let tcx = self.infcx.tcx;
         let gcx = tcx.global_tcx();
-        // let closure_base_def_id = tcx.closure_base_def_id(self.mir_def_id);
-        // let identity_substs = Substs::identity_for_item(gcx, closure_base_def_id);
-        let identity_substs = Substs::identity_for_item(gcx, self.mir_def_id);
+        let closure_base_def_id = tcx.closure_base_def_id(self.mir_def_id);
+        let identity_substs = Substs::identity_for_item(gcx, closure_base_def_id);
         let fr_substs = match defining_ty {
             DefiningTy::Closure(_, substs) | DefiningTy::Generator(_, substs, _) => {
                 // In the case of closures, we rely on the fact that
@@ -607,13 +614,12 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
             DefiningTy::FnDef(_, substs) | DefiningTy::Const(_, substs) => substs,
         };
 
-        let global_mapping = iter::once((gcx.types.re_static, fr_static));
         let subst_mapping = identity_substs
             .regions()
             .zip(fr_substs.regions().map(|r| r.to_region_vid()));
 
-        UniversalRegionIndices {
-            indices: global_mapping.chain(subst_mapping).collect(),
+        for (region, region_vid) in subst_mapping {
+            indices.indices.insert(region, region_vid);
         }
     }
 
@@ -742,6 +748,7 @@ trait InferCtxtExt<'tcx> {
         &self,
         origin: NLLRegionVariableOrigin,
         value: &T,
+        indices: &mut UniversalRegionIndices<'tcx>,
     ) -> T
     where
         T: TypeFoldable<'tcx>;
@@ -762,12 +769,17 @@ impl<'cx, 'gcx, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'cx, 'gcx, 'tcx> {
         &self,
         origin: NLLRegionVariableOrigin,
         value: &T,
+        indices: &mut UniversalRegionIndices<'tcx>,
     ) -> T
     where
         T: TypeFoldable<'tcx>,
     {
-        self.tcx.fold_regions(value, &mut false, |_region, _depth| {
-            self.next_nll_region_var(origin)
+        debug!("replace_free_regions_with_nll_infer_vars(value={:?})", value);
+        self.tcx.fold_regions(value, &mut false, |liberated_region, _depth| {
+            let region_vid = self.next_nll_region_var(origin);
+            debug!("liberated_region={:?}=>{:?}", liberated_region, region_vid);
+            indices.insert_free_region(liberated_region, region_vid.to_region_vid());
+            region_vid
         })
     }
 
@@ -801,6 +813,15 @@ impl<'cx, 'gcx, 'tcx> InferCtxtExt<'tcx> for InferCtxt<'cx, 'gcx, 'tcx> {
 }
 
 impl<'tcx> UniversalRegionIndices<'tcx> {
+    /// When computing the defining type, we might end up liberating regions if we're
+    /// processing a generator or closure. This interface provides a way to insert those
+    /// regions.
+    fn insert_free_region(&mut self, r: ty::Region<'tcx>,
+                          vid: ty::RegionVid)
+    {
+        self.indices.insert(r, vid);
+    }
+
     /// Initially, the `UniversalRegionIndices` map contains only the
     /// early-bound regions in scope. Once that is all setup, we come
     /// in later and instantiate the late-bound regions, and then we

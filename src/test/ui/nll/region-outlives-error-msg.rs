@@ -22,6 +22,7 @@ struct CookieJar<'data> {
 impl CookieJar<'data> {
     fn cookie_me(&self, _: &i32) -> Cookie<'data> {
         let next = 22;
+        //~^ The region for the argument `self` does not outlive the region `'data`. Required due to
         me_want_cookie(next, self)
     }
 }

@@ -4,7 +4,7 @@ warning: not reporting region error due to -Znll
 LL |             let p = x.get();
    |                     ^^^^^^^
 
-error[E0478]: The region for the argument `_outlives1` does not outlive the region for the argument `_outlives3`. Required due to this expression:
+error[E0999]: The region for the argument `_outlives1` does not outlive the region for the argument `_outlives3`. Required due to this expression:
   --> $DIR/propagate-approximated-fail-no-postdom.rs:55:17
    |
 LL |             let p = x.get();
@@ -54,4 +54,4 @@ LL | | }
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0478`.
+For more information about this error, try `rustc --explain E0999`.

@@ -4,3 +4,18 @@ warning: not reporting region error due to -Znll
 LL |     &*x
    |     ^^^
 
+error[E0999]: The region for the argument `x` does not outlive the region `'static`. Required due to this expression:
+  --> $DIR/region-lbr-named-does-not-outlive-static.rs:19:5
+   |
+LL |     &*x
+   |     ^^^
+   |
+note: the too-short region is created here
+  --> $DIR/region-lbr-named-does-not-outlive-static.rs:18:12
+   |
+LL | fn foo<'a>(x: &'a u32) -> &'static u32 {
+   |            ^
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0999`.

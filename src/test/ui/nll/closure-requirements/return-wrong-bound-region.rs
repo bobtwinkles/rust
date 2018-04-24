@@ -20,7 +20,7 @@
 fn test() {
     expect_sig(|a, b| b); // ought to return `a`
     //~^ WARN not reporting region error due to -Znll
-    //~| ERROR does not outlive free region
+    //~| ERROR does not outlive the region
 }
 
 fn expect_sig<F>(f: F) -> F

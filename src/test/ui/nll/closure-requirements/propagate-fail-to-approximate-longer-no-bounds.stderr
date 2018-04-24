@@ -4,7 +4,7 @@ warning: not reporting region error due to -Znll
 LL |         demand_y(x, y, x.get())
    |         ^^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0478]: The region for the argument `x` does not outlive the region for the argument `_outlives`. Required due to this expression:
+error[E0999]: The region for the argument `x` does not outlive the region for the argument `_outlives`. Required due to this expression:
   --> $DIR/propagate-fail-to-approximate-longer-no-bounds.rs:47:18
    |
 LL |         demand_y(x, y, x.get())
@@ -29,7 +29,7 @@ LL |       establish_relationships(&cell_a, &cell_b, |_outlives, x, y| {
 LL | |         // Only works if 'x: 'y:
 LL | |         demand_y(x, y, x.get())
 LL | |         //~^ WARN not reporting region error due to -Znll
-LL | |         //~| ERROR does not outlive free region
+LL | |         //~| ERROR does not outlive the region
 LL | |     });
    | |_____^
    |
@@ -54,4 +54,4 @@ LL | | }
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0478`.
+For more information about this error, try `rustc --explain E0999`.

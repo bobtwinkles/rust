@@ -9,7 +9,7 @@ note: External requirements
    |
 LL |       establish_relationships(&cell_a, &cell_b, |_outlives1, _outlives2, x, y| {
    |  _______________________________________________^
-LL | |         //~^ ERROR does not outlive free region
+LL | |         //~^ ERROR does not outlive the region
 LL | |         // Only works if 'x: 'y:
 LL | |         demand_y(x, y, x.get())
 LL | |         //~^ WARNING not reporting region error due to -Znll
@@ -23,3 +23,38 @@ LL | |     });
    = note: number of external vids: 3
    = note: where '_#1r: '_#0r
 
+error[E0999]: The region for the argument `cell_a` does not outlive the region `'static`. Required due to this expression:
+  --> $DIR/propagate-approximated-shorter-to-static-wrong-bound.rs:48:47
+   |
+LL |       establish_relationships(&cell_a, &cell_b, |_outlives1, _outlives2, x, y| {
+   |  _______________________________________________^
+LL | |         //~^ ERROR does not outlive the region
+LL | |         // Only works if 'x: 'y:
+LL | |         demand_y(x, y, x.get())
+LL | |         //~^ WARNING not reporting region error due to -Znll
+LL | |     });
+   | |_____^
+   |
+note: the too-short region is created here
+  --> $DIR/propagate-approximated-shorter-to-static-wrong-bound.rs:47:19
+   |
+LL | fn supply<'a, 'b>(cell_a: Cell<&'a u32>, cell_b: Cell<&'b u32>) {
+   |                   ^^^^^^
+
+note: No external requirements
+  --> $DIR/propagate-approximated-shorter-to-static-wrong-bound.rs:47:1
+   |
+LL | / fn supply<'a, 'b>(cell_a: Cell<&'a u32>, cell_b: Cell<&'b u32>) {
+LL | |     establish_relationships(&cell_a, &cell_b, |_outlives1, _outlives2, x, y| {
+LL | |         //~^ ERROR does not outlive the region
+LL | |         // Only works if 'x: 'y:
+...  |
+LL | |     });
+LL | | }
+   | |_^
+   |
+   = note: defining type: DefId(0/0:6 ~ propagate_approximated_shorter_to_static_wrong_bound[317d]::supply[0]) with substs []
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0999`.

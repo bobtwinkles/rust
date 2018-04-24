@@ -4,7 +4,7 @@ warning: not reporting region error due to -Znll
 LL |     expect_sig(|a, b| b); // ought to return `a`
    |                       ^
 
-error[E0478]: The region for the argument `b` does not outlive the region for the argument `a`. Required due to this expression:
+error[E0999]: The region for the argument `b` does not outlive the region for the argument `a`. Required due to this expression:
   --> $DIR/return-wrong-bound-region.rs:21:23
    |
 LL |     expect_sig(|a, b| b); // ought to return `a`
@@ -38,7 +38,7 @@ note: No external requirements
 LL | / fn test() {
 LL | |     expect_sig(|a, b| b); // ought to return `a`
 LL | |     //~^ WARN not reporting region error due to -Znll
-LL | |     //~| ERROR does not outlive free region
+LL | |     //~| ERROR does not outlive the region
 LL | | }
    | |_^
    |
@@ -46,4 +46,4 @@ LL | | }
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0478`.
+For more information about this error, try `rustc --explain E0999`.

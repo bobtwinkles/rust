@@ -40,13 +40,12 @@ LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |
    = help: consider adding an explicit lifetime bound `T: ReFree(DefId(0/0:8 ~ projection_one_region_closure[317d]::no_relationships_late[0]), BrNamed(crate0:DefIndex(1:16), 'a))`...
 
-error[E0478]: The region `'b` does not outlive the region for the argument `cell`
-   |
-note: required due to this expression
+error[E0999]: The region `'b` does not outlive the region for the argument `cell`. Required due to this expression:
   --> $DIR/projection-one-region-closure.rs:56:20
    |
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                    ^^^^
+   |
 note: the region to be outlived is created here
   --> $DIR/projection-one-region-closure.rs:52:37
    |
@@ -61,7 +60,7 @@ LL | | where
 LL | |     T: Anything<'b>,
 LL | | {
 ...  |
-LL | |     //~| ERROR does not outlive free region
+LL | |     //~| ERROR does not outlive the region
 LL | | }
    | |_^
    |
@@ -95,9 +94,7 @@ LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |
    = help: consider adding an explicit lifetime bound `T: ReEarlyBound(0, 'a)`...
 
-error[E0478]: The region `'b` does not outlive the region `'a`
-   |
-note: required due to this expression
+error[E0999]: The region `'b` does not outlive the region `'a`. Required due to this expression:
   --> $DIR/projection-one-region-closure.rs:68:20
    |
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
@@ -111,7 +108,7 @@ LL | | where
 LL | |     T: Anything<'b>,
 LL | |     'a: 'a,
 ...  |
-LL | |     //~| ERROR does not outlive free region
+LL | |     //~| ERROR does not outlive the region
 LL | | }
    | |_^
    |
@@ -146,9 +143,7 @@ LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |
    = help: consider adding an explicit lifetime bound `T: ReEarlyBound(0, 'a)`...
 
-error[E0478]: The region `'b` does not outlive the region `'a`
-   |
-note: required due to this expression
+error[E0999]: The region `'b` does not outlive the region `'a`. Required due to this expression:
   --> $DIR/projection-one-region-closure.rs:90:20
    |
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
@@ -162,7 +157,7 @@ LL | | where
 LL | |     T: Anything<'b>,
 LL | |     T::AssocType: 'a,
 ...  |
-LL | |     //~| ERROR free region `ReEarlyBound(1, 'b)` does not outlive free region `ReEarlyBound(0, 'a)`
+LL | |     //~| ERROR The region `'b` does not outlive the region `'a`
 LL | | }
    | |_^
    |
@@ -209,5 +204,5 @@ LL | | }
 
 error: aborting due to 6 previous errors
 
-Some errors occurred: E0309, E0478.
+Some errors occurred: E0309, E0999.
 For more information about an error, try `rustc --explain E0309`.

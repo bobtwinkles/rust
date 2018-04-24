@@ -140,20 +140,30 @@ impl<'tcx> RegionInferenceContext<'tcx> {
             Some(RegionClassification::Global) => RegionDescription::Static,
             Some(RegionClassification::External) => {
                 // External regions arise when checking closures.
-                bug!("External region errors not written");
+                region.and_then(|r| {
+                    self.try_describe_universal_region(mir_def_id, infcx, r)
+                }).expect(&format!("Couldn't derive a description for an external universal \
+                                    region {:?}| {:?} ({:?})",
+                                   region_vid,
+                                   self.definitions[region_vid],
+                                   region))
             }
             // Local regions here should only come from incoming lifetime parameters.
             Some(RegionClassification::Local) => {
                 let region = region.expect("unable to convert Local region to an error region");
                 self.try_describe_universal_region(mir_def_id, infcx, region)
                     .expect(&format!("Couldn't derive a description for a local universal \
-                                     region {:?} ({:?})",
-                            self.definitions[region_vid],
-                            region))
+                                     region {:?}| {:?} ({:?})",
+                                     region_vid,
+                                     self.definitions[region_vid],
+                                     region))
             },
             None =>
                 self.try_describe_existential_region(mir, region_vid)
-                    .expect("Couldn't derive a description for a ")
+                    .expect(&format!("Couldn't derive a description for an existential region: \
+                                      {:?} {:?}",
+                                     region_vid,
+                                     self.definitions[region_vid]))
 
         }
     }
@@ -190,6 +200,10 @@ impl<'tcx> RegionInferenceContext<'tcx> {
         // Mostly copied from
         // librustc/infer/error_reporting/nice_region_error/util.rs:find_arg_with_region
         let id = match *anon_region {
+            ty::ReStatic => {
+                // If the region is static, we already know where this is going
+                return Some(RegionDescription::Static)
+            },
             ty::ReFree(ref free_region) => free_region.scope,
             ty::ReEarlyBound(ref ebr) => {
                 // If we have an explicit name for the region, just return that
