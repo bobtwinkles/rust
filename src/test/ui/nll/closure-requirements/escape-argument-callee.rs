@@ -34,7 +34,7 @@ fn test() {
     {
         let y = 22;
         let mut closure = expect_sig(|p, y| *p = y);
-        //~^ ERROR does not outlive free region
+        //~^ ERROR does not outlive the
         //~| WARNING not reporting region error due to -Znll
         closure(&mut p, &y);
     }

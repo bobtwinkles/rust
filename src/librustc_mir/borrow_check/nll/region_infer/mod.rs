@@ -15,13 +15,12 @@ use rustc::infer::NLLRegionVariableOrigin;
 use rustc::infer::RegionObligation;
 use rustc::infer::RegionVariableOrigin;
 use rustc::infer::SubregionOrigin;
-use rustc::infer::error_reporting::nice_region_error::NiceRegionError;
 use rustc::infer::region_constraints::{GenericKind, VarOrigins};
 use rustc::mir::{ClosureOutlivesRequirement, ClosureOutlivesSubject, ClosureRegionRequirements,
                  Local, Location, Mir};
 use rustc::traits::ObligationCause;
 use rustc::ty::{self, RegionVid, Ty, TypeFoldable};
-use rustc::util::common::{self, ErrorReported};
+use rustc::util::common;
 use rustc_data_structures::bitvec::BitVector;
 use rustc_data_structures::indexed_vec::{Idx, IndexVec};
 use std::fmt;
@@ -35,6 +34,7 @@ use self::dfs::{CopyFromSourceToTarget, TestTargetOutlivesSource};
 mod dump_mir;
 mod graphviz;
 mod values;
+mod error_reporting;
 use self::values::{RegionValueElements, RegionValues};
 
 use super::ToRegionVid;
@@ -79,6 +79,7 @@ pub struct RegionInferenceContext<'tcx> {
 
 struct TrackCauses(bool);
 
+#[derive(Debug)]
 struct RegionDefinition<'tcx> {
     /// Why we created this variable. Mostly these will be
     /// `RegionVariableOrigin::NLL`, but some variables get created
@@ -461,7 +462,7 @@ impl<'tcx> RegionInferenceContext<'tcx> {
             outlives_requirements.as_mut(),
         );
 
-        self.check_universal_regions(infcx, mir_def_id, outlives_requirements.as_mut());
+        self.check_universal_regions(infcx, mir, mir_def_id, outlives_requirements.as_mut());
 
         let outlives_requirements = outlives_requirements.unwrap_or(vec![]);
 
@@ -612,6 +613,7 @@ impl<'tcx> RegionInferenceContext<'tcx> {
             }
 
             // Oh the humanity. Obviously we will do better than this error eventually.
+            // FIXME: (bob_twinkles)
             let lower_bound_region = self.to_error_region(type_test.lower_bound);
             if let Some(lower_bound_region) = lower_bound_region {
                 let region_scope_tree = &tcx.region_scope_tree(mir_def_id);
@@ -636,28 +638,6 @@ impl<'tcx> RegionInferenceContext<'tcx> {
                     type_test.span,
                     &format!("`{}` does not live long enough", type_test.generic_kind,),
                 );
-            }
-        }
-    }
-
-    /// Converts a region inference variable into a `ty::Region` that
-    /// we can use for error reporting. If `r` is universally bound,
-    /// then we use the name that we have on record for it. If `r` is
-    /// existentially bound, then we check its inferred value and try
-    /// to find a good name from that. Returns `None` if we can't find
-    /// one (e.g., this is just some random part of the CFG).
-    pub fn to_error_region(&self, r: RegionVid) -> Option<ty::Region<'tcx>> {
-        if self.universal_regions.is_universal_region(r) {
-            return self.definitions[r].external_name;
-        } else {
-            let inferred_values = self.inferred_values
-                .as_ref()
-                .expect("region values not yet inferred");
-            let upper_bound = self.universal_upper_bound(r);
-            if inferred_values.contains(r, upper_bound) {
-                self.to_error_region(upper_bound)
-            } else {
-                None
             }
         }
     }
@@ -953,6 +933,7 @@ impl<'tcx> RegionInferenceContext<'tcx> {
     fn check_universal_regions<'gcx>(
         &self,
         infcx: &InferCtxt<'_, 'gcx, 'tcx>,
+        mir: &Mir<'tcx>,
         mir_def_id: DefId,
         mut propagated_outlives_requirements: Option<&mut Vec<ClosureOutlivesRequirement<'gcx>>>,
     ) {
@@ -968,6 +949,7 @@ impl<'tcx> RegionInferenceContext<'tcx> {
         for (fr, _) in universal_definitions {
             self.check_universal_region(
                 infcx,
+                mir,
                 mir_def_id,
                 fr,
                 &mut propagated_outlives_requirements,
@@ -986,6 +968,7 @@ impl<'tcx> RegionInferenceContext<'tcx> {
     fn check_universal_region<'gcx>(
         &self,
         infcx: &InferCtxt<'_, 'gcx, 'tcx>,
+        mir: &Mir<'tcx>,
         mir_def_id: DefId,
         longer_fr: RegionVid,
         propagated_outlives_requirements: &mut Option<&mut Vec<ClosureOutlivesRequirement<'gcx>>>,
@@ -1042,55 +1025,13 @@ impl<'tcx> RegionInferenceContext<'tcx> {
             // Note: in this case, we use the unapproximated regions
             // to report the error. This gives better error messages
             // in some cases.
-            self.report_error(infcx, mir_def_id, longer_fr, shorter_fr, blame_span);
+            self.report_not_outlived_error(infcx,
+                                           mir,
+                                           mir_def_id,
+                                           longer_fr,
+                                           shorter_fr,
+                                           blame_span);
         }
-    }
-
-    /// Report an error because the universal region `fr` was required to outlive
-    /// `outlived_fr` but it is not known to do so. For example:
-    ///
-    /// ```
-    /// fn foo<'a, 'b>(x: &'a u32) -> &'b u32 { x }
-    /// ```
-    ///
-    /// Here we would be invoked with `fr = 'a` and `outlived_fr = `'b`.
-    fn report_error(
-        &self,
-        infcx: &InferCtxt<'_, '_, 'tcx>,
-        mir_def_id: DefId,
-        fr: RegionVid,
-        outlived_fr: RegionVid,
-        blame_span: Span,
-    ) {
-        // Obviously uncool error reporting.
-
-        let fr_name = self.to_error_region(fr);
-        let outlived_fr_name = self.to_error_region(outlived_fr);
-
-        if let (Some(f), Some(o)) = (fr_name, outlived_fr_name) {
-            let tables = infcx.tcx.typeck_tables_of(mir_def_id);
-            let nice = NiceRegionError::new_from_span(infcx.tcx, blame_span, o, f, Some(tables));
-            if let Some(ErrorReported) = nice.try_report() {
-                return;
-            }
-        }
-
-        let fr_string = match fr_name {
-            Some(r) => format!("free region `{}`", r),
-            None => format!("free region `{:?}`", fr),
-        };
-
-        let outlived_fr_string = match outlived_fr_name {
-            Some(r) => format!("free region `{}`", r),
-            None => format!("free region `{:?}`", outlived_fr),
-        };
-
-        let mut diag = infcx.tcx.sess.struct_span_err(
-            blame_span,
-            &format!("{} does not outlive {}", fr_string, outlived_fr_string,),
-        );
-
-        diag.emit();
     }
 
     /// Tries to finds a good span to blame for the fact that `fr1`

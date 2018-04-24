@@ -407,6 +407,7 @@ impl<'tcx> UniversalRegions<'tcx> {
     pub fn named_universal_regions<'s>(
         &'s self,
     ) -> impl Iterator<Item = (ty::Region<'tcx>, ty::RegionVid)> + 's {
+        // FIXME: (bob_twinkles) expand this to cover external regions
         self.indices.indices.iter().map(|(&r, &v)| (r, v))
     }
 
@@ -451,6 +452,7 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
         debug!("build: indices={:?}", indices);
 
         let bound_inputs_and_output = self.compute_inputs_and_output(&indices, defining_ty);
+        debug!("build: bound_inputs_and_output={:?}", bound_inputs_and_output);
 
         // "Liberate" the late-bound regions. These correspond to
         // "local" free regions.
@@ -584,8 +586,9 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
     ) -> UniversalRegionIndices<'tcx> {
         let tcx = self.infcx.tcx;
         let gcx = tcx.global_tcx();
-        let closure_base_def_id = tcx.closure_base_def_id(self.mir_def_id);
-        let identity_substs = Substs::identity_for_item(gcx, closure_base_def_id);
+        // let closure_base_def_id = tcx.closure_base_def_id(self.mir_def_id);
+        // let identity_substs = Substs::identity_for_item(gcx, closure_base_def_id);
+        let identity_substs = Substs::identity_for_item(gcx, self.mir_def_id);
         let fr_substs = match defining_ty {
             DefiningTy::Closure(_, substs) | DefiningTy::Generator(_, substs, _) => {
                 // In the case of closures, we rely on the fact that
@@ -597,6 +600,7 @@ impl<'cx, 'gcx, 'tcx> UniversalRegionsBuilder<'cx, 'gcx, 'tcx> {
                 // the `closure_base_def_id`.
                 assert!(substs.substs.len() >= identity_substs.len());
                 assert_eq!(substs.substs.regions().count(), identity_substs.regions().count());
+                debug!("compute_indices: identity_substs: {:?}", identity_substs);
                 substs.substs
             }
 

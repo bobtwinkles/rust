@@ -4,11 +4,22 @@ warning: not reporting region error due to -Znll
 LL |             let p = x.get();
    |                     ^^^^^^^
 
-error: free region `ReFree(DefId(0/1:20 ~ propagate_approximated_fail_no_postdom[317d]::supply[0]::{{closure}}[0]), BrAnon(1))` does not outlive free region `ReFree(DefId(0/1:20 ~ propagate_approximated_fail_no_postdom[317d]::supply[0]::{{closure}}[0]), BrAnon(2))`
+error[E0478]: The region for the argument `_outlives1` does not outlive the region for the argument `_outlives3`. Required due to this expression:
   --> $DIR/propagate-approximated-fail-no-postdom.rs:55:17
    |
 LL |             let p = x.get();
    |                 ^
+   |
+note: the too-short region is created here
+  --> $DIR/propagate-approximated-fail-no-postdom.rs:53:10
+   |
+LL |         |_outlives1, _outlives2, _outlives3, x, y| {
+   |          ^^^^^^^^^^
+note: the region to be outlived is created here
+  --> $DIR/propagate-approximated-fail-no-postdom.rs:53:34
+   |
+LL |         |_outlives1, _outlives2, _outlives3, x, y| {
+   |                                  ^^^^^^^^^^
 
 note: No external requirements
   --> $DIR/propagate-approximated-fail-no-postdom.rs:53:9
@@ -17,7 +28,7 @@ LL | /         |_outlives1, _outlives2, _outlives3, x, y| {
 LL | |             // Only works if 'x: 'y:
 LL | |             let p = x.get();
 LL | |             //~^ WARN not reporting region error due to -Znll
-LL | |             //~| ERROR does not outlive free region
+LL | |             //~| ERROR does not outlive the region
 LL | |             demand_y(x, y, p)
 LL | |         },
    | |_________^
@@ -43,3 +54,4 @@ LL | | }
 
 error: aborting due to previous error
 
+For more information about this error, try `rustc --explain E0478`.

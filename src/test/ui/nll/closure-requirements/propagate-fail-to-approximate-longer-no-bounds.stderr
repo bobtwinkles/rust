@@ -4,11 +4,22 @@ warning: not reporting region error due to -Znll
 LL |         demand_y(x, y, x.get())
    |         ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: free region `ReFree(DefId(0/1:18 ~ propagate_fail_to_approximate_longer_no_bounds[317d]::supply[0]::{{closure}}[0]), BrAnon(4))` does not outlive free region `ReFree(DefId(0/1:18 ~ propagate_fail_to_approximate_longer_no_bounds[317d]::supply[0]::{{closure}}[0]), BrAnon(2))`
+error[E0478]: The region for the argument `x` does not outlive the region for the argument `_outlives`. Required due to this expression:
   --> $DIR/propagate-fail-to-approximate-longer-no-bounds.rs:47:18
    |
 LL |         demand_y(x, y, x.get())
    |                  ^
+   |
+note: the too-short region is created here
+  --> $DIR/propagate-fail-to-approximate-longer-no-bounds.rs:45:59
+   |
+LL |     establish_relationships(&cell_a, &cell_b, |_outlives, x, y| {
+   |                                                           ^
+note: the region to be outlived is created here
+  --> $DIR/propagate-fail-to-approximate-longer-no-bounds.rs:45:48
+   |
+LL |     establish_relationships(&cell_a, &cell_b, |_outlives, x, y| {
+   |                                                ^^^^^^^^^
 
 note: No external requirements
   --> $DIR/propagate-fail-to-approximate-longer-no-bounds.rs:45:47
@@ -43,3 +54,4 @@ LL | | }
 
 error: aborting due to previous error
 
+For more information about this error, try `rustc --explain E0478`.

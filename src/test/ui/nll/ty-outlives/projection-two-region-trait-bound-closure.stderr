@@ -239,11 +239,18 @@ LL |     with_signature(cell, t, |cell, t| require(cell, t));
    = note: number of external vids: 3
    = note: where <T as Anything<ReClosureBound('_#1r), ReClosureBound('_#1r)>>::AssocType: '_#2r
 
-error: free region `ReEarlyBound(0, 'b)` does not outlive free region `ReFree(DefId(0/0:13 ~ projection_two_region_trait_bound_closure[317d]::two_regions[0]), BrNamed(crate0:DefIndex(1:43), 'a))`
+error[E0478]: The region `'b` does not outlive the region for the argument `cell`
+   |
+note: required due to this expression
   --> $DIR/projection-two-region-trait-bound-closure.rs:109:20
    |
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                    ^^^^
+note: the region to be outlived is created here
+  --> $DIR/projection-two-region-trait-bound-closure.rs:105:27
+   |
+LL | fn two_regions<'a, 'b, T>(cell: Cell<&'a ()>, t: T)
+   |                           ^^^^
 
 note: No external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:105:1
@@ -330,4 +337,5 @@ LL | | }
 
 error: aborting due to 4 previous errors
 
-For more information about this error, try `rustc --explain E0309`.
+Some errors occurred: E0309, E0478.
+For more information about an error, try `rustc --explain E0309`.

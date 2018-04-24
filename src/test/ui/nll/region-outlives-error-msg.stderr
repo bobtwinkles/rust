@@ -1,0 +1,16 @@
+error[E0478]: The region for the argument `self` does not outlive the region `'data`
+   |
+note: required due to this expression
+  --> $DIR/region-outlives-error-msg.rs:24:13
+   |
+LL |         let next = 22;
+   |             ^^^^
+note: the too-short region is created here
+  --> $DIR/region-outlives-error-msg.rs:23:18
+   |
+LL |     fn cookie_me(&self, _: &i32) -> Cookie<'data> {
+   |                  ^^^^^
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0478`.

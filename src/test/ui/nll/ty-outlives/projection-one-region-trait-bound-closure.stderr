@@ -31,11 +31,18 @@ LL |     with_signature(cell, t, |cell, t| require(cell, t));
    = note: number of external vids: 3
    = note: where '_#1r: '_#2r
 
-error: free region `ReEarlyBound(0, 'b)` does not outlive free region `ReFree(DefId(0/0:8 ~ projection_one_region_trait_bound_closure[317d]::no_relationships_late[0]), BrNamed(crate0:DefIndex(1:16), 'a))`
+error[E0478]: The region `'b` does not outlive the region for the argument `cell`
+   |
+note: required due to this expression
   --> $DIR/projection-one-region-trait-bound-closure.rs:48:20
    |
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                    ^^^^
+note: the region to be outlived is created here
+  --> $DIR/projection-one-region-trait-bound-closure.rs:44:37
+   |
+LL | fn no_relationships_late<'a, 'b, T>(cell: Cell<&'a ()>, t: T)
+   |                                     ^^^^
 
 note: No external requirements
   --> $DIR/projection-one-region-trait-bound-closure.rs:44:1
@@ -70,7 +77,9 @@ LL |     with_signature(cell, t, |cell, t| require(cell, t));
    = note: number of external vids: 4
    = note: where '_#2r: '_#3r
 
-error: free region `ReEarlyBound(1, 'b)` does not outlive free region `ReEarlyBound(0, 'a)`
+error[E0478]: The region `'b` does not outlive the region `'a`
+   |
+note: required due to this expression
   --> $DIR/projection-one-region-trait-bound-closure.rs:59:20
    |
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
@@ -110,7 +119,9 @@ LL |     with_signature(cell, t, |cell, t| require(cell, t));
    = note: number of external vids: 4
    = note: where '_#2r: '_#3r
 
-error: free region `ReEarlyBound(1, 'b)` does not outlive free region `ReEarlyBound(0, 'a)`
+error[E0478]: The region `'b` does not outlive the region `'a`
+   |
+note: required due to this expression
   --> $DIR/projection-one-region-trait-bound-closure.rs:80:20
    |
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
@@ -202,3 +213,4 @@ LL | | }
 
 error: aborting due to 3 previous errors
 
+For more information about this error, try `rustc --explain E0478`.
